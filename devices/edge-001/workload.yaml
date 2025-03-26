@@ -1,13 +1,24 @@
-apiVersion: v1
-kind: Pod
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: edge-test-app
-  namespace: edge-001
+  name: parsing-service
+  namespace: default
 spec:
-  nodeSelector:
-    kubernetes.io/hostname: edge-001  # 👈 Replace this with your actual device hostname
-  containers:
-    - name: edge-container
-      image: nginx:alpine  # 👈 Change to your actual app image
-      ports:
-        - containerPort: 80
+  replicas: 1
+  selector:
+    matchLabels:
+      app: parsing-service
+  template:
+    metadata:
+      labels:
+        app: parsing-service
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: metalcloud  # Replace with your node name
+      containers:
+        - name: parsing-service
+          image: hashicorp/http-echo:latest  # ✅ Test image
+          args:
+            - "-text=Parsing Service is live"
+          ports:
+            - containerPort: 5678
