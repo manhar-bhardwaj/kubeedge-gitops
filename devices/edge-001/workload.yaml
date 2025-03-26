@@ -14,7 +14,7 @@ spec:
         app: parsing-service
     spec:
       nodeSelector:
-        kubernetes.io/hostname: metalcloud  # Replace with your node name
+        kubernetes.io/hostname: 00000000098200f5-iot-pi     # Replace with your node name
       containers:
         - name: parsing-service
           image: hashicorp/http-echo:latest  # ✅ Test image
