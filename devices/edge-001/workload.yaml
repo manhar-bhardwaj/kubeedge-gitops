@@ -13,11 +13,12 @@ spec:
       labels:
         app: parsing-service
     spec:
+      hostNetwork: true  # 🔥 This exposes it on the Pi’s real IP (e.g., 192.168.100.29:5678)
       nodeSelector:
-        kubernetes.io/hostname: 00000000098200f5-iot-pi     # Replace with your node name
+        kubernetes.io/hostname: 00000000098200f5-iot-pi
       containers:
         - name: parsing-service
-          image: hashicorp/http-echo:latest  # ✅ Test image
+          image: hashicorp/http-echo:latest
           args:
             - "-text=Parsing Service is live"
           ports:
