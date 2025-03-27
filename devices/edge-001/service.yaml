@@ -9,6 +9,6 @@ spec:
   ports:
     - protocol: TCP
       port: 80
-      targetPort: 5678
+      targetPort: 8000
       nodePort: 30007  # Optional: choose a fixed port or let Kubernetes assign one
   type: NodePort
