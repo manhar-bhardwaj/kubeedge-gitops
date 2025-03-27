@@ -19,7 +19,7 @@ spec:
       containers:
         - name: fastapi-time-app
           image: ghcr.io/manhar400/fastapi-time-app:offline
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           args: ["--port", "8890"]  # ✅ Pass the port as an argument
           ports:
             - containerPort: 8890   # ✅ Match the port you’re using
