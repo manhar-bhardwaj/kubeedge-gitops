@@ -13,13 +13,15 @@ spec:
       labels:
         app: parsing-service
     spec:
-      hostNetwork: true  # 🔥 This exposes it on the Pi’s real IP (e.g., 192.168.100.29:5678)
+      hostNetwork: true  # ⚠️ Make sure port 8890 is not in use on the Pi
       nodeSelector:
         kubernetes.io/hostname: 00000000098200f5-iot-pi
       containers:
         - name: fastapi-time-app
           image: ghcr.io/manhar400/fastapi-time-app:latest
+          imagePullPolicy: Always
+          args: ["--port", "8890"]  # ✅ Pass the port as an argument
           ports:
-            - containerPort: 8000
+            - containerPort: 8890   # ✅ Match the port you’re using
       imagePullSecrets:
-        - name: ghcr-secret   # This is the secret you created for private registry authentication
+        - name: ghcr-secret

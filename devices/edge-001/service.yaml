@@ -8,7 +8,7 @@ spec:
     app: parsing-service
   ports:
     - protocol: TCP
-      port: 80
-      targetPort: 8000
-      nodePort: 30007  # Optional: choose a fixed port or let Kubernetes assign one
-  type: NodePort
+      port: 80               # Port exposed inside the cluster (e.g., used by Ingress or other services)
+      targetPort: 8890       # ✅ Must match containerPort in Deployment
+      nodePort: 30007        # Optional: exposed on the node's IP at this port (http://<nodeIP>:30007)
+  type: NodePort             # Exposes the service externally via <NodeIP>:nodePort
