@@ -22,4 +22,4 @@ spec:
           args:
             - "-text=Parsing Service is live"
           ports:
-            - containerPort: 5678
+            - containerPort: 5679
