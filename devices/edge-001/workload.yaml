@@ -17,9 +17,9 @@ spec:
       nodeSelector:
         kubernetes.io/hostname: 00000000098200f5-iot-pi
       containers:
-        - name: parsing-service
+        - name: fastapi-time-app
           image: ghcr.io/manhar400/fastapi-time-app:latest
-          args:
-            - "-text=Parsing Service is live"
           ports:
-            - containerPort: 5678
+            - containerPort: 8000
+      imagePullSecrets:
+        - name: ghcr-secret   # This is the secret you created for private registry authentication
