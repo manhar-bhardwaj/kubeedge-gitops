@@ -18,7 +18,7 @@ spec:
         kubernetes.io/hostname: 00000000098200f5-iot-pi
       containers:
         - name: parsing-service
-          image: hashicorp/http-echo:latest
+          image: ghcr.io/manhar400/fastapi-time-app:latest
           args:
             - "-text=Parsing Service is live"
           ports:
