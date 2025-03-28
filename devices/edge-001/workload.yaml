@@ -18,7 +18,7 @@ spec:
         kubernetes.io/hostname: 00000000098200f5-iot-pi
       containers:
         - name: fastapi-time-app
-          image: ghcr.io/manhar400/fastapi-time-app:offline
+          image: ghcr.io/manhar400/fastapi-time-app:v1
           imagePullPolicy: IfNotPresent
           args: ["--port", "8890"]  # ✅ Pass the port as an argument
           ports:
