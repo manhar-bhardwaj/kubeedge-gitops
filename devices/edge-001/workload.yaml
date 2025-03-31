@@ -23,6 +23,7 @@ spec:
           imagePullPolicy: IfNotPresent
           args: ["--port", "8890"]  # ✅ Pass the port as an argument
           ports:
-            - containerPort: 8890   # ✅ Match the port you’re using
+            - containerPort: 8890
+            - hostPort: 8890       # Optional: bind to the host port (not recommended for production)
       imagePullSecrets:
         - name: ghcr-secret
