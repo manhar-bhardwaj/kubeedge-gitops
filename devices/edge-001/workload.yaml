@@ -14,7 +14,7 @@ spec:
         app: parsing-service
     spec:
       automountServiceAccountToken: false
-      hostNetwork: false  # ⚠️ Make sure port 8890 is not in use on the Pi
+      hostNetwork: true  # ⚠️ Make sure port 8890 is not in use on the Pi
       nodeSelector:
         kubernetes.io/hostname: 00000000098200f5-iot-pi
       containers:
