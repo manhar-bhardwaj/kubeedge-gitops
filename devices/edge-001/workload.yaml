@@ -24,5 +24,6 @@ spec:
           args: ["--port", "8890"]  # ✅ Pass the port as an argument
           ports:
             - containerPort: 8890 # Optional: bind to the host port (not recommended for production)
+              hostPort: 8890
       imagePullSecrets:
         - name: ghcr-secret
