@@ -26,3 +26,4 @@ spec:
             - containerPort: 8890 # Optional: bind to the host port (not recommended for production)
       imagePullSecrets:
         - name: ghcr-secret
+
