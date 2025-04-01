@@ -12,3 +12,4 @@ spec:
       targetPort: 8890       # ✅ Must match containerPort in Deployment
       nodePort: 30007        # Optional: exposed on the node's IP at this port (http://<nodeIP>:30007)
   type: NodePort             # Exposes the service externally via <NodeIP>:nodePort
+    # type: ClusterIP        # Default, only accessible within the cluster
