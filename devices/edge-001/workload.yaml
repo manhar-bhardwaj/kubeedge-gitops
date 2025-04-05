@@ -16,7 +16,7 @@ spec:
       automountServiceAccountToken: false
       hostNetwork: true  # ⚠️ Make sure port 8890 is not in use on the Pi
       nodeSelector:
-        kubernetes.io/hostname: 00000000098200f5-iot-pi
+        kubernetes.io/hostname: 000000008c3ae850-iot-pi
       containers:
         - name: fastapi-time-app
           image: ghcr.io/manhar400/fastapi-time-app:offline
@@ -26,5 +26,3 @@ spec:
             - containerPort: 8890 # Optional: bind to the host port (not recommended for production)
       imagePullSecrets:
         - name: ghcr-secret
-
-
