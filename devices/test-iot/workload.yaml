@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: parsing-service
-  namespace: default
+  namespace: edge-pi-2
 spec:
   replicas: 1
   selector:
