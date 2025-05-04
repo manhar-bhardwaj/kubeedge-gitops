@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: parsing-service
-  namespace: default
+  namespace: edge-pi-2
 spec:
   selector:
     app: parsing-service
