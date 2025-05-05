@@ -1,5 +1,3 @@
-Here’s a clean and well-structured `README.md` file for your KubeEdge setup, including GHCR integration, Argo CD port forwarding, Docker login, and VPN setup instructions:
-
 ---
 
 # 🚀 KubeEdge Edge Node Setup Guide (ARM64)
@@ -116,5 +114,3 @@ Then go to `https://localhost:8989`.
 Once complete, your ARM64 edge node will be securely connected to the CloudCore, able to pull images from GHCR, and manageable via Argo CD.
 
 ---
-
-Would you like me to generate a formatted `.md` file from this so you can download it directly?
