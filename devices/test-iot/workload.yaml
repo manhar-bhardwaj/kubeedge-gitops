@@ -16,10 +16,10 @@ spec:
       automountServiceAccountToken: false
       hostNetwork: true  # ⚠️ Make sure port 8890 is not in use on the Pi
       nodeSelector:
-        kubernetes.io/hostname: 00000000098200f5-iot-pi
+        kubernetes.io/hostname: 00000000cf62c74b-iot-pi
       containers:
         - name: fastapi-time-app
-          image: ghcr.io/manhar400/govind-iot:1.0.4
+          image: ghcr.io/manhar400/my-app-image:1.0
           imagePullPolicy: IfNotPresent
           args: ["--port", "8890"]  # ✅ Pass the port as an argument
           ports:
