@@ -1,8 +1,24 @@
+# workload.yaml
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: code-storage
+  namespace: edge-pi-2
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Mi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: parsing-service
   namespace: edge-pi-2
+  labels:
+    app: parsing-service
 spec:
   replicas: 1
   selector:
@@ -12,19 +28,65 @@ spec:
     metadata:
       labels:
         app: parsing-service
+      annotations:
+        # Change this to trigger redeployment in ArgoCD
+        deployment.version: "v1"
     spec:
       automountServiceAccountToken: false
-      hostNetwork: true  # ⚠️ Make sure port 8890 is not in use on the Pi
+      hostNetwork: true
       nodeSelector:
         kubernetes.io/hostname: 00000000cf62c74b-iot-pi
+      
+      initContainers:
+      - name: git-clone
+        image: alpine/git:latest
+        command: ['sh', '-c']
+        args:
+          - |
+            echo "Starting code sync..."
+            
+            # Using a sample public FastAPI repo
+            REPO_URL="https://github.com/tiangolo/fastapi-simple-example.git"
+            
+            # Check if code exists
+            if [ -d "/code/app" ] && [ "$(ls -A /code/app)" ]; then
+              echo "Code exists - trying to update..."
+              cd /code/repo && git pull || echo "Update failed - using existing code"
+            else
+              echo "First time - cloning repository..."
+              git clone $REPO_URL /code/repo || exit 1
+              mkdir -p /code/app
+            fi
+            
+            # Copy code to app directory
+            cp -r /code/repo/* /code/app/
+            echo "Code sync complete!"
+        
+        volumeMounts:
+        - name: code-volume
+          mountPath: /code
+      
       containers:
-        - name: fastapi-time-app
-          image: ghcr.io/manhar400/my-app-image:1.0
-          imagePullPolicy: IfNotPresent
-          args: ["--port", "8890"]  # ✅ Pass the port as an argument
-          ports:
-            - containerPort: 8890 # Optional: bind to the host port (not recommended for production)
+      - name: fastapi-app
+        image: ghcr.io/manhar400/my-app-image:1.0
+        imagePullPolicy: IfNotPresent
+        args: ["--port", "8890"]
+        ports:
+        - containerPort: 8890
+        
+        volumeMounts:
+        - name: code-volume
+          mountPath: /app/dynamic-code
+          subPath: app
+        
+        env:
+        - name: PYTHONPATH
+          value: "/app/dynamic-code:/app"
+      
+      volumes:
+      - name: code-volume
+        persistentVolumeClaim:
+          claimName: code-storage
+      
       imagePullSecrets:
-        - name: ghcr-secret
-
-
+      - name: ghcr-secret
