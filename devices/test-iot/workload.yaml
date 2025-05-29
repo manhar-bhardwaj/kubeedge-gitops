@@ -1,4 +1,4 @@
-# workload.yaml - NO SECRETS HARDCODED
+# workload.yaml - optimized with commit checking
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -29,7 +29,8 @@ spec:
       labels:
         app: parsing-service
       annotations:
-        deployment.version: "v4"
+        deployment.version: "v7"
+        git.commit: "main"  # Change this to deploy specific commit
     spec:
       automountServiceAccountToken: false
       hostNetwork: true
@@ -42,27 +43,140 @@ spec:
         command: ['sh', '-c']
         args:
           - |
-            echo "Starting code sync..."
+            echo "=== Code Sync Starting ==="
             
-            # Setup git credentials
-            git config --global credential.helper store
-            echo "https://${GIT_USER}:${GIT_PASS}@github.com" > ~/.git-credentials
+            TARGET_COMMIT="${GIT_COMMIT:-main}"
+            echo "Target commit/branch: $TARGET_COMMIT"
             
-            # Your PRIVATE repository
-            REPO_URL="https://github.com/NowPurchase/Arsenal.git"
+            # Check if we have existing code
+            if [ -d "/code/app" ] && [ "$(ls -A /code/app)" ]; then
+              echo "✓ Found existing code"
+              
+              # Check current commit if repo exists
+              CURRENT_COMMIT=""
+              if [ -d "/code/repo/.git" ]; then
+                cd /code/repo
+                CURRENT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+                echo "Current commit: $CURRENT_COMMIT"
+                
+                # If target is a branch, get its latest commit
+                if [ "$TARGET_COMMIT" = "main" ] || [ "$TARGET_COMMIT" = "master" ]; then
+                  # For branches, we need to check remote to see if there's updates
+                  echo "Target is a branch - checking for updates..."
+                else
+                  # For specific commits, check if we already have it
+                  if [ "$CURRENT_COMMIT" = "$TARGET_COMMIT" ]; then
+                    echo "✓ Already at target commit $TARGET_COMMIT"
+                    echo "✓ No sync needed - using existing code"
+                    exit 0
+                  fi
+                fi
+              fi
+              
+              # Check network connectivity
+              echo "Checking network connectivity..."
+              if ! wget -q --spider --timeout=5 https://github.com 2>/dev/null; then
+                echo "⚠ No network connectivity"
+                echo "✓ Using existing code (offline mode)"
+                exit 0
+              fi
+              
+              echo "✓ Network available - checking for updates"
+              
+              # Setup git credentials
+              git config --global credential.helper store
+              echo "https://${GIT_USER}:${GIT_PASS}@github.com" > ~/.git-credentials
+              
+              REPO_URL="https://github.com/NowPurchase/Arsenal.git"
+              
+              # Update existing repo
+              if [ -d "/code/repo/.git" ]; then
+                cd /code/repo
+                
+                # Fetch latest
+                echo "Fetching latest changes..."
+                git fetch --all || {
+                  echo "⚠ Fetch failed - using existing code"
+                  exit 0
+                }
+                
+                # Check if target commit exists and if we need to update
+                if [ "$TARGET_COMMIT" = "main" ] || [ "$TARGET_COMMIT" = "master" ]; then
+                  # For branch, check if remote is ahead
+                  LOCAL_HASH=$(git rev-parse HEAD)
+                  REMOTE_HASH=$(git rev-parse origin/$TARGET_COMMIT)
+                  
+                  if [ "$LOCAL_HASH" = "$REMOTE_HASH" ]; then
+                    echo "✓ Already up-to-date with $TARGET_COMMIT"
+                    echo "✓ No sync needed"
+                    exit 0
+                  else
+                    echo "Updates available - syncing..."
+                    git checkout $TARGET_COMMIT && git pull
+                  fi
+                else
+                  # For specific commit/tag
+                  git checkout $TARGET_COMMIT || {
+                    echo "⚠ Checkout failed - using existing code"
+                    exit 0
+                  }
+                fi
+                
+                # Copy updated code
+                echo "Copying updated code..."
+                cp -r /code/repo/* /code/app/ 2>/dev/null || true
+                NEW_COMMIT=$(git rev-parse HEAD)
+                echo "✓ Code updated to: $NEW_COMMIT"
+              else
+                # Repo corrupted - need full clone
+                echo "Repository corrupted - full clone needed..."
+                rm -rf /code/repo
+                git clone $REPO_URL /code/repo || {
+                  echo "⚠ Clone failed - using existing code"
+                  exit 0
+                }
+                
+                cd /code/repo
+                if [ "$TARGET_COMMIT" != "main" ] && [ "$TARGET_COMMIT" != "master" ]; then
+                  git checkout $TARGET_COMMIT || true
+                fi
+                cp -r /code/repo/* /code/app/
+                echo "✓ Full resync complete"
+              fi
+              
+            else
+              # First deployment - no existing code
+              echo "⚠ No existing code - initial deployment"
+              
+              # Must have network for first deployment
+              if ! wget -q --spider --timeout=5 https://github.com 2>/dev/null; then
+                echo "✗ ERROR: No network for initial deployment"
+                exit 1
+              fi
+              
+              # Setup credentials and clone
+              git config --global credential.helper store
+              echo "https://${GIT_USER}:${GIT_PASS}@github.com" > ~/.git-credentials
+              
+              REPO_URL="https://github.com/NowPurchase/Arsenal.git"
+              
+              echo "Cloning repository..."
+              git clone $REPO_URL /code/repo || exit 1
+              
+              cd /code/repo
+              if [ "$TARGET_COMMIT" != "main" ] && [ "$TARGET_COMMIT" != "master" ]; then
+                echo "Checking out: $TARGET_COMMIT"
+                git checkout $TARGET_COMMIT || exit 1
+              fi
+              
+              mkdir -p /code/app
+              cp -r /code/repo/* /code/app/
+              
+              FINAL_COMMIT=$(git rev-parse HEAD)
+              echo "✓ Initial deployment complete at commit: $FINAL_COMMIT"
+            fi
             
-            # Clean start (remove this section after first successful clone)
-            rm -rf /code/repo /code/app
-            
-            # Clone repository
-            echo "Cloning repository..."
-            git clone $REPO_URL /code/repo || exit 1
-            
-            # Copy to app directory
-            mkdir -p /code/app
-            cp -r /code/repo/* /code/app/
-            
-            echo "Code sync complete!"
+            echo "=== Code Sync Complete ==="
 
         env:
         - name: GIT_USER
@@ -75,6 +189,10 @@ spec:
             secretKeyRef:
               name: git-credentials
               key: password
+        - name: GIT_COMMIT
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.annotations['git.commit']
 
         volumeMounts:
         - name: code-volume
