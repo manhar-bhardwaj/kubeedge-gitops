@@ -29,14 +29,13 @@ spec:
       labels:
         app: parsing-service
       annotations:
-        # Change this to trigger redeployment in ArgoCD
         deployment.version: "v1"
     spec:
       automountServiceAccountToken: false
       hostNetwork: true
       nodeSelector:
         kubernetes.io/hostname: 00000000cf62c74b-iot-pi
-      
+
       initContainers:
       - name: git-clone
         image: alpine/git:latest
@@ -45,8 +44,12 @@ spec:
           - |
             echo "Starting code sync..."
             
-            # Using a sample public FastAPI repo
-            REPO_URL="https://github.com/githubtraining/hellogitworld.git"
+            # Configure git with credentials
+            git config --global credential.helper store
+            echo "https://${GIT_USER}:${GIT_PASS}@github.com" > ~/.git-credentials
+            
+            # Your private repo
+            REPO_URL="https://github.com/NowPurchase/Arsenal.git"
             
             # Check if code exists
             if [ -d "/code/app" ] && [ "$(ls -A /code/app)" ]; then
@@ -61,11 +64,23 @@ spec:
             # Copy code to app directory
             cp -r /code/repo/* /code/app/
             echo "Code sync complete!"
-        
+
+        env:
+        - name: GIT_USER
+          valueFrom:
+            secretKeyRef:
+              name: git-credentials
+              key: username
+        - name: GIT_PASS
+          valueFrom:
+            secretKeyRef:
+              name: git-credentials
+              key: password
+
         volumeMounts:
         - name: code-volume
           mountPath: /code
-      
+
       containers:
       - name: fastapi-app
         image: ghcr.io/manhar400/my-app-image:1.0
@@ -73,20 +88,20 @@ spec:
         args: ["--port", "8890"]
         ports:
         - containerPort: 8890
-        
+
         volumeMounts:
         - name: code-volume
           mountPath: /app/dynamic-code
           subPath: app
-        
+
         env:
         - name: PYTHONPATH
           value: "/app/dynamic-code:/app"
-      
+
       volumes:
       - name: code-volume
         persistentVolumeClaim:
           claimName: code-storage
-      
+
       imagePullSecrets:
-      - name: ghcr-secret
+      - name: ghcr-secret  # This is for pulling the container image
