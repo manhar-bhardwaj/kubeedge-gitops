@@ -1,4 +1,4 @@
-# workload.yaml
+# workload.yaml - NO SECRETS HARDCODED
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -29,7 +29,7 @@ spec:
       labels:
         app: parsing-service
       annotations:
-        deployment.version: "v3"  # Changed to force update
+        deployment.version: "v4"
     spec:
       automountServiceAccountToken: false
       hostNetwork: true
@@ -44,28 +44,24 @@ spec:
           - |
             echo "Starting code sync..."
             
-            # Configure git with credentials if they exist
-            if [ -n "$GIT_USER" ] && [ -n "$GIT_PASS" ]; then
-              echo "Configuring git credentials..."
-              git config --global credential.helper store
-              echo "https://${GIT_USER}:${GIT_PASS}@github.com" > ~/.git-credentials
-            fi
+            # Setup git credentials
+            git config --global credential.helper store
+            echo "https://${GIT_USER}:${GIT_PASS}@github.com" > ~/.git-credentials
             
-            # Your repository URL
+            # Your PRIVATE repository
             REPO_URL="https://github.com/NowPurchase/Arsenal.git"
             
-            # Check if code exists
-            if [ -d "/code/app" ] && [ "$(ls -A /code/app)" ]; then
-              echo "Code exists - trying to update..."
-              cd /code/repo && git pull || echo "Update failed - using existing code"
-            else
-              echo "First time - cloning repository..."
-              git clone $REPO_URL /code/repo || exit 1
-              mkdir -p /code/app
-            fi
+            # Clean start (remove this section after first successful clone)
+            rm -rf /code/repo /code/app
             
-            # Copy code to app directory
+            # Clone repository
+            echo "Cloning repository..."
+            git clone $REPO_URL /code/repo || exit 1
+            
+            # Copy to app directory
+            mkdir -p /code/app
             cp -r /code/repo/* /code/app/
+            
             echo "Code sync complete!"
 
         env:
@@ -74,13 +70,11 @@ spec:
             secretKeyRef:
               name: git-credentials
               key: username
-              optional: true  # Makes it optional for public repos
         - name: GIT_PASS
           valueFrom:
             secretKeyRef:
               name: git-credentials
               key: password
-              optional: true  # Makes it optional for public repos
 
         volumeMounts:
         - name: code-volume
@@ -107,6 +101,3 @@ spec:
       - name: code-volume
         persistentVolumeClaim:
           claimName: code-storage
-
-      imagePullSecrets:
-      - name: ghcr-secret
