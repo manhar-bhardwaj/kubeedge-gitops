@@ -29,7 +29,7 @@ spec:
       labels:
         app: parsing-service
       annotations:
-        deployment.version: "v1"
+        deployment.version: "v3"  # Changed to force update
     spec:
       automountServiceAccountToken: false
       hostNetwork: true
@@ -44,11 +44,14 @@ spec:
           - |
             echo "Starting code sync..."
             
-            # Configure git with credentials
-            git config --global credential.helper store
-            echo "https://${GIT_USER}:${GIT_PASS}@github.com" > ~/.git-credentials
+            # Configure git with credentials if they exist
+            if [ -n "$GIT_USER" ] && [ -n "$GIT_PASS" ]; then
+              echo "Configuring git credentials..."
+              git config --global credential.helper store
+              echo "https://${GIT_USER}:${GIT_PASS}@github.com" > ~/.git-credentials
+            fi
             
-            # Your private repo
+            # Your repository URL
             REPO_URL="https://github.com/NowPurchase/Arsenal.git"
             
             # Check if code exists
@@ -71,11 +74,13 @@ spec:
             secretKeyRef:
               name: git-credentials
               key: username
+              optional: true  # Makes it optional for public repos
         - name: GIT_PASS
           valueFrom:
             secretKeyRef:
               name: git-credentials
               key: password
+              optional: true  # Makes it optional for public repos
 
         volumeMounts:
         - name: code-volume
@@ -104,4 +109,4 @@ spec:
           claimName: code-storage
 
       imagePullSecrets:
-      - name: ghcr-secret  # This is for pulling the container image
+      - name: ghcr-secret
