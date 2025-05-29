@@ -30,7 +30,7 @@ spec:
         app: parsing-service
       annotations:
         deployment.version: "v7"
-        git.commit: "main"  # Change this to deploy specific commit
+        git.commit: "67c040b"  # Change this to deploy specific commit
     spec:
       automountServiceAccountToken: false
       hostNetwork: true
