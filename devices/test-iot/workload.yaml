@@ -46,7 +46,7 @@ spec:
             echo "Starting code sync..."
             
             # Using a sample public FastAPI repo
-            REPO_URL="https://github.com/tiangolo/fastapi-simple-example.git"
+            REPO_URL="https://github.com/githubtraining/hellogitworld.git"
             
             # Check if code exists
             if [ -d "/code/app" ] && [ "$(ls -A /code/app)" ]; then
