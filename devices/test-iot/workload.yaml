@@ -1,16 +1,4 @@
-# workload.yaml - optimized with commit checking
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: code-storage
-  namespace: edge-pi-2
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 100Mi
+# workload.yaml - enhanced for ArgoCD-triggered sync only
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -29,8 +17,8 @@ spec:
       labels:
         app: parsing-service
       annotations:
-        deployment.version: "v7"
-        git.commit: "67c040b"  # Change this to deploy specific commit
+        # ArgoCD will update this when you change it in git
+        git.commit: "67c040b"  # Change this to trigger new deployment
     spec:
       automountServiceAccountToken: false
       hostNetwork: true
@@ -38,50 +26,57 @@ spec:
         kubernetes.io/hostname: 00000000cf62c74b-iot-pi
 
       initContainers:
-      - name: git-clone
+      - name: git-sync
         image: alpine/git:latest
+        imagePullPolicy: IfNotPresent
         command: ['sh', '-c']
         args:
           - |
-            echo "=== Code Sync Starting ==="
+            echo "=== Parser Sync Starting ==="
             
+            # Get target commit from annotation
             TARGET_COMMIT="${GIT_COMMIT:-main}"
             echo "Target commit/branch: $TARGET_COMMIT"
+            
+            # Store the target commit for comparison
+            TARGET_FILE="/code/.target_commit"
+            CURRENT_FILE="/code/.current_commit"
             
             # Check if we have existing code
             if [ -d "/code/app" ] && [ "$(ls -A /code/app)" ]; then
               echo "✓ Found existing code"
               
-              # Check current commit if repo exists
-              CURRENT_COMMIT=""
-              if [ -d "/code/repo/.git" ]; then
-                cd /code/repo
-                CURRENT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
-                echo "Current commit: $CURRENT_COMMIT"
+              # Check if this deployment wants the same commit we already have
+              if [ -f "$CURRENT_FILE" ] && [ -f "$TARGET_FILE" ]; then
+                CURRENT_COMMIT=$(cat $CURRENT_FILE)
+                LAST_TARGET=$(cat $TARGET_FILE)
                 
-                # If target is a branch, get its latest commit
-                if [ "$TARGET_COMMIT" = "main" ] || [ "$TARGET_COMMIT" = "master" ]; then
-                  # For branches, we need to check remote to see if there's updates
-                  echo "Target is a branch - checking for updates..."
-                else
-                  # For specific commits, check if we already have it
-                  if [ "$CURRENT_COMMIT" = "$TARGET_COMMIT" ]; then
-                    echo "✓ Already at target commit $TARGET_COMMIT"
-                    echo "✓ No sync needed - using existing code"
-                    exit 0
-                  fi
+                echo "Current commit: $CURRENT_COMMIT"
+                echo "Last target: $LAST_TARGET"
+                echo "New target: $TARGET_COMMIT"
+                
+                # If ArgoCD hasn't changed the target commit, skip everything
+                if [ "$TARGET_COMMIT" = "$LAST_TARGET" ] && [ -n "$CURRENT_COMMIT" ]; then
+                  echo "✓ Target commit unchanged from last deployment"
+                  echo "✓ Using existing code at commit: $CURRENT_COMMIT"
+                  exit 0
                 fi
               fi
               
+              # New target commit requested - try to sync
+              echo "📝 New deployment target: $TARGET_COMMIT"
+              
               # Check network connectivity
-              echo "Checking network connectivity..."
-              if ! wget -q --spider --timeout=5 https://github.com 2>/dev/null; then
+              if ! timeout 5 wget -q --spider https://github.com 2>/dev/null; then
                 echo "⚠ No network connectivity"
+                echo "⚠ Cannot sync to new commit $TARGET_COMMIT"
                 echo "✓ Using existing code (offline mode)"
+                # Still update target file so we know what we want
+                echo "$TARGET_COMMIT" > "$TARGET_FILE"
                 exit 0
               fi
               
-              echo "✓ Network available - checking for updates"
+              echo "✓ Network available - syncing to $TARGET_COMMIT"
               
               # Setup git credentials
               git config --global credential.helper store
@@ -93,55 +88,61 @@ spec:
               if [ -d "/code/repo/.git" ]; then
                 cd /code/repo
                 
-                # Fetch latest
+                # Fetch with timeout for flaky network
                 echo "Fetching latest changes..."
-                git fetch --all || {
+                if ! timeout 30 git fetch --all; then
                   echo "⚠ Fetch failed - using existing code"
+                  echo "$TARGET_COMMIT" > "$TARGET_FILE"
                   exit 0
-                }
+                fi
                 
-                # Check if target commit exists and if we need to update
+                # Checkout target commit
+                if ! timeout 20 git checkout $TARGET_COMMIT; then
+                  echo "⚠ Checkout failed - using existing code"
+                  echo "$TARGET_COMMIT" > "$TARGET_FILE"
+                  exit 0
+                fi
+                
+                # If it's a branch, pull latest
                 if [ "$TARGET_COMMIT" = "main" ] || [ "$TARGET_COMMIT" = "master" ]; then
-                  # For branch, check if remote is ahead
-                  LOCAL_HASH=$(git rev-parse HEAD)
-                  REMOTE_HASH=$(git rev-parse origin/$TARGET_COMMIT)
-                  
-                  if [ "$LOCAL_HASH" = "$REMOTE_HASH" ]; then
-                    echo "✓ Already up-to-date with $TARGET_COMMIT"
-                    echo "✓ No sync needed"
-                    exit 0
-                  else
-                    echo "Updates available - syncing..."
-                    git checkout $TARGET_COMMIT && git pull
-                  fi
-                else
-                  # For specific commit/tag
-                  git checkout $TARGET_COMMIT || {
-                    echo "⚠ Checkout failed - using existing code"
-                    exit 0
-                  }
+                  timeout 20 git pull || true
                 fi
                 
                 # Copy updated code
                 echo "Copying updated code..."
+                rm -rf /code/app/*
                 cp -r /code/repo/* /code/app/ 2>/dev/null || true
-                NEW_COMMIT=$(git rev-parse HEAD)
-                echo "✓ Code updated to: $NEW_COMMIT"
+                
+                # Store the commit we actually got
+                FINAL_COMMIT=$(git rev-parse HEAD)
+                echo "$FINAL_COMMIT" > "$CURRENT_FILE"
+                echo "$TARGET_COMMIT" > "$TARGET_FILE"
+                
+                echo "✓ Code synced to commit: $FINAL_COMMIT"
               else
-                # Repo corrupted - need full clone
-                echo "Repository corrupted - full clone needed..."
+                # Repo missing/corrupted - need full clone
+                echo "Repository missing - cloning..."
                 rm -rf /code/repo
-                git clone $REPO_URL /code/repo || {
+                
+                if ! timeout 120 git clone $REPO_URL /code/repo; then
                   echo "⚠ Clone failed - using existing code"
+                  echo "$TARGET_COMMIT" > "$TARGET_FILE"
                   exit 0
-                }
+                fi
                 
                 cd /code/repo
                 if [ "$TARGET_COMMIT" != "main" ] && [ "$TARGET_COMMIT" != "master" ]; then
                   git checkout $TARGET_COMMIT || true
                 fi
+                
+                rm -rf /code/app/*
                 cp -r /code/repo/* /code/app/
-                echo "✓ Full resync complete"
+                
+                FINAL_COMMIT=$(git rev-parse HEAD)
+                echo "$FINAL_COMMIT" > "$CURRENT_FILE"
+                echo "$TARGET_COMMIT" > "$TARGET_FILE"
+                
+                echo "✓ Fresh clone complete at: $FINAL_COMMIT"
               fi
               
             else
@@ -149,7 +150,7 @@ spec:
               echo "⚠ No existing code - initial deployment"
               
               # Must have network for first deployment
-              if ! wget -q --spider --timeout=5 https://github.com 2>/dev/null; then
+              if ! timeout 5 wget -q --spider https://github.com 2>/dev/null; then
                 echo "✗ ERROR: No network for initial deployment"
                 exit 1
               fi
@@ -161,7 +162,10 @@ spec:
               REPO_URL="https://github.com/NowPurchase/Arsenal.git"
               
               echo "Cloning repository..."
-              git clone $REPO_URL /code/repo || exit 1
+              if ! timeout 120 git clone $REPO_URL /code/repo; then
+                echo "✗ ERROR: Initial clone failed"
+                exit 1
+              fi
               
               cd /code/repo
               if [ "$TARGET_COMMIT" != "main" ] && [ "$TARGET_COMMIT" != "master" ]; then
@@ -173,10 +177,13 @@ spec:
               cp -r /code/repo/* /code/app/
               
               FINAL_COMMIT=$(git rev-parse HEAD)
+              echo "$FINAL_COMMIT" > "$CURRENT_FILE"
+              echo "$TARGET_COMMIT" > "$TARGET_FILE"
+              
               echo "✓ Initial deployment complete at commit: $FINAL_COMMIT"
             fi
             
-            echo "=== Code Sync Complete ==="
+            echo "=== Parser Sync Complete ==="
 
         env:
         - name: GIT_USER
@@ -217,5 +224,6 @@ spec:
 
       volumes:
       - name: code-volume
-        persistentVolumeClaim:
-          claimName: code-storage
+        hostPath:
+          path: /var/lib/kubeedge/parsing-service-code
+          type: DirectoryOrCreate
