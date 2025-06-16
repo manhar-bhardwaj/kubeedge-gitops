@@ -128,5 +128,4 @@ sudo sed -i '/metaServer:/,/^[^ ]/s/^\(\s*\)enable:.*$/\1enable: true/' /etc/kub
 
 # 🔁 Restart edgecore to apply config changes
 sudo systemctl restart edgecore.service
-
 echo "✅ Edge node setup complete."

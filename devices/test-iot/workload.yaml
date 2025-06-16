@@ -18,7 +18,7 @@ spec:
         app: parsing-service
       annotations:
         # ArgoCD will update this when you change it in git
-        git.commit: "1bd8114"  # Change this to trigger new deployment
+        git.commit: "9b78333"  # Change this to trigger new deployment
     spec:
       automountServiceAccountToken: false
       hostNetwork: true
@@ -111,8 +111,9 @@ spec:
                 
                 # Copy updated code
                 echo "Copying updated code..."
+                mkdir -p /code/app/arsenal
                 rm -rf /code/app/*
-                cp -r /code/repo/* /code/app/ 2>/dev/null || true
+                cp -r /code/repo/arsenal* /code/app/arsenal 2>/dev/null || true
                 
                 # Store the commit we actually got
                 FINAL_COMMIT=$(git rev-parse HEAD)
@@ -175,7 +176,8 @@ spec:
               fi
               
               mkdir -p /code/app
-              cp -r /code/repo/* /code/app/
+              mkdir -p /code/app/arsenal
+              cp -r /code/repo/arsenal* /code/app/arsenal
               
               FINAL_COMMIT=$(git rev-parse HEAD)
               echo "$FINAL_COMMIT" > "$CURRENT_FILE"
