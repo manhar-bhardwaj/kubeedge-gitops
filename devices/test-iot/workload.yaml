@@ -111,7 +111,7 @@ spec:
                 # Copy updated code
                 echo "Copying updated code..."
                 rm -rf /code/app/*
-                cp -r /code/repo/* /code/app/ 2>/dev/null || true
+                cp -r /code/repo/arsenal/* /code/app/ 2>/dev/null || true
                 
                 # Store the commit we actually got
                 FINAL_COMMIT=$(git rev-parse HEAD)
@@ -136,7 +136,7 @@ spec:
                 fi
                 
                 rm -rf /code/app/*
-                cp -r /code/repo/* /code/app/
+                cp -r /code/repo/arsenal/* /code/app/
                 
                 FINAL_COMMIT=$(git rev-parse HEAD)
                 echo "$FINAL_COMMIT" > "$CURRENT_FILE"
