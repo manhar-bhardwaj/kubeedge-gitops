@@ -1,12 +1,8 @@
-# workload.yaml - enhanced for ArgoCD-triggered sync only
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: parsing-service
   namespace: edge-pi-2
-  labels:
-    app: parsing-service
 spec:
   replicas: 1
   selector:
@@ -16,217 +12,19 @@ spec:
     metadata:
       labels:
         app: parsing-service
-      annotations:
-        # ArgoCD will update this when you change it in git
-        git.commit: "9b78333"  # Change this to trigger new deployment
     spec:
       automountServiceAccountToken: false
-      hostNetwork: true
+      hostNetwork: true  # ⚠️ Make sure port 8890 is not in use on the Pi
       nodeSelector:
         kubernetes.io/hostname: 00000000cf62c74b-iot-pi
+      containers:
+        - name: fastapi-time-app
+          image: ghcr.io/manhar400/fast-api-working:0.2
+          imagePullPolicy: IfNotPresent
+          args: ["--port", "8890"]  # ✅ Pass the port as an argument
+          ports:
+            - containerPort: 8890 # Optional: bind to the host port (not recommended for production)
       imagePullSecrets:
         - name: ghcr-login
-      initContainers:
-      - name: git-sync
-        image: alpine/git:latest
-        imagePullPolicy: IfNotPresent
-        command: ['sh', '-c']
-        args:
-          - |
-            echo "=== Parser Sync Starting ==="
-            
-            # Get target commit from annotation
-            TARGET_COMMIT="${GIT_COMMIT:-main}"
-            echo "Target commit/branch: $TARGET_COMMIT"
-            
-            # Store the target commit for comparison
-            TARGET_FILE="/code/.target_commit"
-            CURRENT_FILE="/code/.current_commit"
-            
-            # Check if we have existing code
-            if [ -d "/code/app" ] && [ "$(ls -A /code/app)" ]; then
-              echo "✓ Found existing code"
-              
-              # Check if this deployment wants the same commit we already have
-              if [ -f "$CURRENT_FILE" ] && [ -f "$TARGET_FILE" ]; then
-                CURRENT_COMMIT=$(cat $CURRENT_FILE)
-                LAST_TARGET=$(cat $TARGET_FILE)
-                
-                echo "Current commit: $CURRENT_COMMIT"
-                echo "Last target: $LAST_TARGET"
-                echo "New target: $TARGET_COMMIT"
-                
-                # If ArgoCD hasn't changed the target commit, skip everything
-                if [ "$TARGET_COMMIT" = "$LAST_TARGET" ] && [ -n "$CURRENT_COMMIT" ]; then
-                  echo "✓ Target commit unchanged from last deployment"
-                  echo "✓ Using existing code at commit: $CURRENT_COMMIT"
-                  exit 0
-                fi
-              fi
-              
-              # New target commit requested - try to sync
-              echo "📝 New deployment target: $TARGET_COMMIT"
-              
-              # Check network connectivity
-              if ! timeout 5 wget -q --spider https://github.com 2>/dev/null; then
-                echo "⚠ No network connectivity"
-                echo "⚠ Cannot sync to new commit $TARGET_COMMIT"
-                echo "✓ Using existing code (offline mode)"
-                # Still update target file so we know what we want
-                echo "$TARGET_COMMIT" > "$TARGET_FILE"
-                exit 0
-              fi
-              
-              echo "✓ Network available - syncing to $TARGET_COMMIT"
-              
-              # Setup git credentials
-              git config --global credential.helper store
-              echo "https://${GIT_USER}:${GIT_PASS}@github.com" > ~/.git-credentials
-              
-              REPO_URL="https://github.com/NowPurchase/Arsenal.git"
-              
-              # Update existing repo
-              if [ -d "/code/repo/.git" ]; then
-                cd /code/repo
-                
-                # Fetch with timeout for flaky network
-                echo "Fetching latest changes..."
-                if ! timeout 30 git fetch --all; then
-                  echo "⚠ Fetch failed - using existing code"
-                  echo "$TARGET_COMMIT" > "$TARGET_FILE"
-                  exit 0
-                fi
-                
-                # Checkout target commit
-                if ! timeout 20 git checkout $TARGET_COMMIT; then
-                  echo "⚠ Checkout failed - using existing code"
-                  echo "$TARGET_COMMIT" > "$TARGET_FILE"
-                  exit 0
-                fi
-                
-                # If it's a branch, pull latest
-                if [ "$TARGET_COMMIT" = "main" ] || [ "$TARGET_COMMIT" = "master" ]; then
-                  timeout 20 git pull || true
-                fi
-                
-                # Copy updated code
-                echo "Copying updated code..."
-                mkdir -p /code/app/arsenal
-                rm -rf /code/app/*
-                cp -r /code/repo/arsenal/* /code/app/arsenal 2>/dev/null || true
-                
-                # Store the commit we actually got
-                FINAL_COMMIT=$(git rev-parse HEAD)
-                echo "$FINAL_COMMIT" > "$CURRENT_FILE"
-                echo "$TARGET_COMMIT" > "$TARGET_FILE"
-                
-                echo "✓ Code synced to commit: $FINAL_COMMIT"
-              else
-                # Repo missing/corrupted - need full clone
-                echo "Repository missing - cloning..."
-                rm -rf /code/repo
-                
-                if ! timeout 120 git clone $REPO_URL /code/repo; then
-                  echo "⚠ Clone failed - using existing code"
-                  echo "$TARGET_COMMIT" > "$TARGET_FILE"
-                  exit 0
-                fi
-                
-                cd /code/repo
-                if [ "$TARGET_COMMIT" != "main" ] && [ "$TARGET_COMMIT" != "master" ]; then
-                  git checkout $TARGET_COMMIT || true
-                fi
-                mkdir -p /code/app/arsenal
-                rm -rf /code/app/*
-                cp -r /code/repo/arsenal/* /code/app/arsenal
-                
-                FINAL_COMMIT=$(git rev-parse HEAD)
-                echo "$FINAL_COMMIT" > "$CURRENT_FILE"
-                echo "$TARGET_COMMIT" > "$TARGET_FILE"
-                
-                echo "✓ Fresh clone complete at: $FINAL_COMMIT"
-              fi
-              
-            else
-              # First deployment - no existing code
-              echo "⚠ No existing code - initial deployment"
-              
-              # Must have network for first deployment
-              if ! timeout 5 wget -q --spider https://github.com 2>/dev/null; then
-                echo "✗ ERROR: No network for initial deployment"
-                exit 1
-              fi
-              
-              # Setup credentials and clone
-              git config --global credential.helper store
-              echo "https://${GIT_USER}:${GIT_PASS}@github.com" > ~/.git-credentials
-              
-              REPO_URL="https://github.com/NowPurchase/Arsenal.git"
-              
-              echo "Cloning repository..."
-              if ! timeout 120 git clone $REPO_URL /code/repo; then
-                echo "✗ ERROR: Initial clone failed"
-                exit 1
-              fi
-              
-              cd /code/repo
-              if [ "$TARGET_COMMIT" != "main" ] && [ "$TARGET_COMMIT" != "master" ]; then
-                echo "Checking out: $TARGET_COMMIT"
-                git checkout $TARGET_COMMIT || exit 1
-              fi
-              
-              mkdir -p /code/app
-              mkdir -p /code/app/arsenal
-              cp -r /code/repo/arsenal/* /code/app/arsenal
-              
-              FINAL_COMMIT=$(git rev-parse HEAD)
-              echo "$FINAL_COMMIT" > "$CURRENT_FILE"
-              echo "$TARGET_COMMIT" > "$TARGET_FILE"
-              
-              echo "✓ Initial deployment complete at commit: $FINAL_COMMIT"
-            fi
-            
-            echo "=== Parser Sync Complete ==="
 
-        env:
-        - name: GIT_USER
-          valueFrom:
-            secretKeyRef:
-              name: git-credentials
-              key: username
-        - name: GIT_PASS
-          valueFrom:
-            secretKeyRef:
-              name: git-credentials
-              key: password
-        - name: GIT_COMMIT
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.annotations['git.commit']
 
-        volumeMounts:
-        - name: code-volume
-          mountPath: /code
-
-      containers:
-      - name: fastapi-app
-        image: ghcr.io/manhar400/fast-api-working:0.1
-        imagePullPolicy: IfNotPresent
-        args: ["--port", "8890"]
-        ports:
-        - containerPort: 8890
-
-        volumeMounts:
-        - name: code-volume
-          mountPath: /app/dynamic-code
-          subPath: app
-
-        env:
-        - name: PYTHONPATH
-          value: "/app/dynamic-code:/app"
-
-      volumes:
-      - name: code-volume
-        hostPath:
-          path: /var/lib/kubeedge/parsing-service-code
-          type: DirectoryOrCreate
