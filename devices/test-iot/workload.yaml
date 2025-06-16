@@ -24,7 +24,8 @@ spec:
       hostNetwork: true
       nodeSelector:
         kubernetes.io/hostname: 00000000cf62c74b-iot-pi
-
+      imagePullSecrets:
+        - name: ghcr-login
       initContainers:
       - name: git-sync
         image: alpine/git:latest
