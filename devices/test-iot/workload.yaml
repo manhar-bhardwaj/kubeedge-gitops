@@ -18,7 +18,7 @@ spec:
         app: parsing-service
       annotations:
         # ArgoCD will update this when you change it in git
-        git.commit: "cce3da3"  # Change this to trigger new deployment
+        git.commit: "1bd8114"  # Change this to trigger new deployment
     spec:
       automountServiceAccountToken: false
       hostNetwork: true
