@@ -207,7 +207,7 @@ spec:
 
       containers:
       - name: fastapi-app
-        image: ghcr.io/manhar400/my-app-image:1.0
+        image: ghcr.io/manhar400/fast-api-working:0.1
         imagePullPolicy: IfNotPresent
         args: ["--port", "8890"]
         ports:
