@@ -113,7 +113,7 @@ spec:
                 echo "Copying updated code..."
                 mkdir -p /code/app/arsenal
                 rm -rf /code/app/*
-                cp -r /code/repo/arsenal* /code/app/arsenal 2>/dev/null || true
+                cp -r /code/repo/arsenal/* /code/app/arsenal 2>/dev/null || true
                 
                 # Store the commit we actually got
                 FINAL_COMMIT=$(git rev-parse HEAD)
@@ -136,9 +136,9 @@ spec:
                 if [ "$TARGET_COMMIT" != "main" ] && [ "$TARGET_COMMIT" != "master" ]; then
                   git checkout $TARGET_COMMIT || true
                 fi
-                
+                mkdir -p /code/app/arsenal
                 rm -rf /code/app/*
-                cp -r /code/repo/* /code/app/
+                cp -r /code/repo/arsenal/* /code/app/arsenal
                 
                 FINAL_COMMIT=$(git rev-parse HEAD)
                 echo "$FINAL_COMMIT" > "$CURRENT_FILE"
@@ -177,7 +177,7 @@ spec:
               
               mkdir -p /code/app
               mkdir -p /code/app/arsenal
-              cp -r /code/repo/arsenal* /code/app/arsenal
+              cp -r /code/repo/arsenal/* /code/app/arsenal
               
               FINAL_COMMIT=$(git rev-parse HEAD)
               echo "$FINAL_COMMIT" > "$CURRENT_FILE"
