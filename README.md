@@ -97,6 +97,94 @@ Then go to `https://localhost:8989`.
 
 ---
 
+## 🔑 7. Get Argo CD Admin Password
+
+Retrieve the initial admin password for Argo CD:
+
+```bash
+kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+```
+
+Login with username `admin` and the retrieved password.
+
+---
+
+## 🐳 8. Container Management on Edge Nodes
+
+### Access Running Containers
+
+List all running containers on an edge node:
+
+```bash
+sudo crictl ps
+```
+
+Access a running container's shell:
+
+```bash
+sudo crictl exec -it <container_id> /bin/sh
+```
+
+### Manage Exited Containers
+
+List all containers (including exited ones):
+
+```bash
+sudo crictl ps -a
+```
+
+Remove exited containers:
+
+```bash
+sudo crictl rm $(sudo crictl ps -a -q --filter state=exited)
+```
+
+View logs from exited containers:
+
+```bash
+sudo crictl logs <container_id>
+```
+
+### Container Images
+
+List downloaded images:
+
+```bash
+sudo crictl images
+```
+
+Remove unused images:
+
+```bash
+sudo crictl rmi <image_id>
+```
+
+---
+
+## 📋 9. Namespace Management
+
+**Important:** Each IoT device requires its own dedicated namespace. This ensures proper isolation and resource management per device.
+
+Create a namespace for a new IoT device:
+
+```bash
+kubectl create namespace <device-name>
+```
+
+Example for device named "sensor-01":
+
+```bash
+kubectl create namespace sensor-01
+```
+
+List all namespaces:
+
+```bash
+kubectl get namespaces
+```
+
+---
+
 ## 📦 Versions Used
 
 | Component    | Version                                     |
