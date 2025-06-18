@@ -21,7 +21,6 @@ spec:
         - name: fastapi-time-app
           image: ghcr.io/manhar400/supercraft:1.1.0
           imagePullPolicy: IfNotPresent
-          args: ["--port", "8890"]  # ✅ Pass the port as an argument
           ports:
             - containerPort: 8890
           volumeMounts:
