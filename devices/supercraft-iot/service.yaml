@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: parsing-service
+  namespace: edge-pi-3
+spec:
+  selector:
+    app: parsing-service
+  ports:
+    - protocol: TCP
+      port: 80               # Port exposed inside the cluster (e.g., used by Ingress or other services)
+      targetPort: 8890       # ✅ Must match containerPort in Deployment       # Optional: exposed on the node's IP at this port (http://<nodeIP>:30007)
+  type: NodePort             # Exposes the service externally via <NodeIP>:nodePort
+    # type: ClusterIP        # Default, only accessible within the cluster

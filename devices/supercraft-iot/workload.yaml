@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: parsing-service
-  namespace: edge-pi-2
+  namespace: edge-pi-3
 spec:
   replicas: 1
   selector:
@@ -16,10 +16,10 @@ spec:
       automountServiceAccountToken: false
       hostNetwork: true  # ⚠️ Make sure port 8890 is not in use on the Pi
       nodeSelector:
-        kubernetes.io/hostname: 00000000cf62c74b-iot-pi
+        kubernetes.io/hostname: 000000004664e2dc-iot-pi
       containers:
         - name: fastapi-time-app
-          image: ghcr.io/manhar400/supercraft:1.1.0
+          image: ghcr.io/manhar400/supercraft:1.1.4
           imagePullPolicy: IfNotPresent
           args: ["--port", "8890"]  # ✅ Pass the port as an argument
           ports:
